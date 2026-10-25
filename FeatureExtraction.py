@@ -16,6 +16,90 @@ import plotly.express as px
 # wav files go through the process of being turned into feature vectors
 
 
+
+
+
+def magPhase(speechFrame, hamming):
+    # we take the speechframe
+    # step 1: hamming window the speech frame
+    # speechFrame is a numPy array of our audio signal
+    
+    
+    # 320 samples in one 20ms window
+    window = np.hamming(hamming)
+    
+    windowed_frame = window * speechFrame
+    #plt.plot(windowed_frame)
+    
+    # now that we have hammed the frame 
+    # we can now use DFT
+    # or FFT in this case
+    
+    wFrame_FFT = np.fft.fft(windowed_frame)
+    
+    # FFT does produce complex numbers
+    #print(wFrame_FFT[1])
+    #print(np.imag(wFrame_FFT))
+    #print(np.real(wFrame_FFT))
+    
+    # then get the mag spec
+    
+    shortTimeMag = np.abs(wFrame_FFT)
+    shortTimePhase = np.angle(wFrame_FFT)
+    
+    #plt.plot(magSpec)
+    #plt.plot(phaseSpec)
+    
+    #figures, axes = plt.subplots(2,1)
+    #axes[0].plot(shortTimeMag)
+    #axes[1].plot(shortTimePhase)
+    #plt.show()
+    
+    
+    return shortTimeMag, shortTimePhase
+
+
+    
+def linear_filterbank(magSpec):
+    print("Beginning linear filterbank")
+    #Hyper parameter for this function
+    filterbank_channels = 8
+    # ----------------------------------------------------
+    # I initially want to implement the simplest version
+    # of the filterbank so that i can gradually step up to 
+    # the mel spec frequency cepstral coefficient filterbank
+    # ----------------------------------------------------
+    # only need the first half samples so can drop the 
+    # second half
+    # ----------------------------------------------------
+    # due to nyquist theorem i can only use half of the 
+    # total plotted points
+    # plotting the magspec
+    half_magspec = int(magSpec.size/2)
+    useful_magspec = magSpec[:half_magspec]
+    #plt.plot(useful_magspec)
+    #plt.show()
+    
+    
+    # this needs to be fixed but for now it works on this 
+    fbank = np.zeros(filterbank_channels)
+    for i in range(filterbank_channels):
+        fbank[i] = sum(useful_magspec[32*(i-1):32*i])
+        
+        
+    return fbank
+
+def linear_filterbank_matrix(magSpec):
+    print("Beginning linear filterbank with Matrix multiplication")
+    
+
+def mel_scaled_filterbank(magSpce):
+    print("Beginnning mel scaled filterbank")
+    
+def log_dct(fbank):
+    print("Completing the log and dct after the filterbank")
+
+
 def getting_wav_files():
     print("Getting wavfiles")
     sample_rate = 16000
@@ -90,22 +174,28 @@ def feature_extraction(wav_file,duration, sample_rate):
     
     magSpec, phaseSpec= magPhase(wav_file[numbers_to_slice[0]:numbers_to_slice[1]], samples_per_window)
     
-    # plotting the magspec
-    #plt.plot(magSpec)
-    #plt.show()
     # ----------------------------------------------------
     # now time for the filterbank section of feature extraction
-    # take the magspec and 
+    # take the magspec and apply the filterbank to generate 
+    # feature vectors
+    # ----------------------------------------------------
+    
+    #plt.plot(linear_filterbank(magSpec))
+    #plt.show()
+    f_bank = np.array(linear_filterbank(magSpec))
+    
+    print(f"fbank shape: {f_bank.shape}")
+    
+    
+    # 8 is also the amount of filterbank channels
+    feature_vector = np.zeros((total_windows,8))
+    
+    feature_vector[0] = f_bank
+    print(feature_vector)
     # ----------------------------------------------------
     
     
     
-    
-    
-def linear_filterbank(magspec, filterbank_channels):
-    print("Beginning linear filterbank")
-    
-    
 
 
 
@@ -119,49 +209,25 @@ def linear_filterbank(magspec, filterbank_channels):
 
 
 
-
-
-def magPhase(speechFrame, hamming):
-    # we take the speechframe
-    # step 1: hamming window the speech frame
-    # speechFrame is a numPy array of our audio signal
-    
-    
-    # 320 samples in one 20ms window
-    window = np.hamming(hamming)
-    
-    windowed_frame = window * speechFrame
-    #plt.plot(windowed_frame)
-    
-    # now that we have hammed the frame 
-    # we can now use DFT
-    # or FFT in this case
-    
-    wFrame_FFT = np.fft.fft(windowed_frame)
-    
-    # FFT does produce complex numbers
-    #print(wFrame_FFT[1])
-    #print(np.imag(wFrame_FFT))
-    #print(np.real(wFrame_FFT))
-    
-    # then get the mag spec
-    
-    shortTimeMag = np.abs(wFrame_FFT)
-    shortTimePhase = np.angle(wFrame_FFT)
-    
-    #plt.plot(magSpec)
-    #plt.plot(phaseSpec)
-    
-    #figures, axes = plt.subplots(2,1)
-    #axes[0].plot(shortTimeMag)
-    #axes[1].plot(shortTimePhase)
-    #plt.show()
-    
-    
-    return shortTimeMag, shortTimePhase
 
 
 getting_wav_files()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

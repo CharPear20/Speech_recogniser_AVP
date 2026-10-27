@@ -41,6 +41,9 @@ def magPhase(speechFrame, hamming):
     #print(wFrame_FFT[1])
     #print(np.imag(wFrame_FFT))
     #print(np.real(wFrame_FFT))
+    #plt.plot(wFrame_FFT)
+    #plt.show()
+    
     
     # then get the mag spec
     
@@ -63,7 +66,7 @@ def magPhase(speechFrame, hamming):
 def linear_filterbank(magSpec):
     print("Beginning linear filterbank")
     #Hyper parameter for this function
-    filterbank_channels = 8
+    filterbank_channels = 5
     # ----------------------------------------------------
     # I initially want to implement the simplest version
     # of the filterbank so that i can gradually step up to 
@@ -77,14 +80,20 @@ def linear_filterbank(magSpec):
     # plotting the magspec
     half_magspec = int(magSpec.size/2)
     useful_magspec = magSpec[:half_magspec]
+    #print(useful_magspec.size)
     #plt.plot(useful_magspec)
     #plt.show()
+    # ----------------------------------------------------
+    #fbank = np.zeros(filterbank_channels)
     
     
+    # ----------------------------------------------------
     # this needs to be fixed but for now it works on this 
     fbank = np.zeros(filterbank_channels)
     for i in range(filterbank_channels):
-        fbank[i] = sum(useful_magspec[32*(i-1):32*i])
+        #fbank[i] = sum(useful_magspec[32*(i-1):32*i])
+        fbank[i] = sum(useful_magspec[32*(i):32*(i+1)])
+    # ----------------------------------------------------
         
         
     return fbank
@@ -92,9 +101,61 @@ def linear_filterbank(magSpec):
 def linear_filterbank_matrix(magSpec):
     print("Beginning linear filterbank with Matrix multiplication")
     
+    half_magspec = int(magSpec.size/2)
+    useful_magspec = magSpec[:half_magspec]
+    
+    
+    one = np.zeros(160)
+    one[0:32] = 1
+    
+    two = np.zeros(160)
+    two[32:64] = 1
+    
+    three = np.zeros(160)
+    three[64:96] = 1
+    
+    four = np.zeros(160)
+    four[96:128] = 1
+    
+    five = np.zeros(160)
+    five[128:160] = 1
+
+
+    f_bank = np.zeros(5)
+
+    f_bank[0] = np.matmul(one, useful_magspec)
+    f_bank[1] = np.matmul(two,useful_magspec)
+    f_bank[2] = np.matmul(three, useful_magspec)
+    f_bank[3] = np.matmul(four,useful_magspec)
+    f_bank[4] = np.matmul(five, useful_magspec)
+    
+    
+    
+    
+    return f_bank
+    
+    
+    
+    
 
 def mel_scaled_filterbank(magSpce):
     print("Beginnning mel scaled filterbank")
+    
+    #step 1) determine the minimum and maximum frequencies 
+    #the magspec displays
+    minimum_frequency = 0
+    maximum_frequency = 16000/2
+    # ----------------------------------------------------
+    # step 2) convert these values onto the melscale
+    mel_minimum = 1125 * np.log(1+minimum_frequency/700)
+    mel_maximum = 1125 * np.log(1+maximum_frequency/700)
+    # ----------------------------------------------------
+    # step three is determining how many filters you want
+    # and then add 2 more filters to it
+    mel_scale_filterbank_channels = 7
+    # now calculate 
+    
+    
     
 def log_dct(fbank):
     print("Completing the log and dct after the filterbank")
@@ -180,21 +241,27 @@ def feature_extraction(wav_file,duration, sample_rate):
     # feature vectors
     # ----------------------------------------------------
     
-    #plt.plot(linear_filterbank(magSpec))
+    #plt.plot(magSpec)
     #plt.show()
-    f_bank = np.array(linear_filterbank(magSpec))
+    #f_bank = np.array(linear_filterbank(magSpec))
     
-    print(f"fbank shape: {f_bank.shape}")
+    #print(f"fbank shape: {f_bank.shape}")
     
     
     # 8 is also the amount of filterbank channels
-    feature_vector = np.zeros((total_windows,8))
+    #feature_vector = np.zeros((total_windows,8))
     
-    feature_vector[0] = f_bank
-    print(feature_vector)
+    #feature_vector[0] = f_bank
+    #print(feature_vector)
     # ----------------------------------------------------
-    
-    
+    # trying to implement the linear filterbank with matrix
+    # multiplication
+    #plt.plot(linear_filterbank_matrix(magSpec))
+    #print(linear_filterbank_matrix(magSpec))
+    #plt.plot(linear_filterbank(magSpec))
+    #print(linear_filterbank(magSpec))
+    #plt.show()
+    mel_scaled_filterbank(magSpec)
     
 
 

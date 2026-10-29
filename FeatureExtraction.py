@@ -12,6 +12,7 @@ import soundfile as sf
 import sounddevice as sd
 import plotly.io as pio
 import plotly.express as px
+import scipy as spy
 # this is the beginning of the coursework this is where the 
 # wav files go through the process of being turned into feature vectors
 
@@ -105,6 +106,12 @@ def linear_filterbank_matrix(magSpec):
     useful_magspec = magSpec[:half_magspec]
     
     
+    # the way i am doing this is redundant 
+    # could be a matrix of 160 columns and 
+    # the same amount of rows that you would 
+    # have for the filterbank channels
+    
+    # i also need to add more filter channels
     one = np.zeros(160)
     one[0:32] = 1
     
@@ -138,11 +145,16 @@ def linear_filterbank_matrix(magSpec):
     
     
 
-def mel_scaled_filterbank(magSpce):
-    print("Beginnning mel scaled filterbank")
+def mel_scaled_filterbank(magSpec):
+    #print("Beginnning mel scaled filterbank")
+    
+    # dont forget to half the magSPEC!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    half_magspec = int(magSpec.size/2)
+    useful_magspec = magSpec[:half_magspec]
     
     #step 1) determine the minimum and maximum frequencies 
     #the magspec displays
+    filter_channels = 22 # this is +2 than what i actually have
     minimum_frequency = 0
     maximum_frequency = 16000/2
     # ----------------------------------------------------
@@ -152,74 +164,231 @@ def mel_scaled_filterbank(magSpce):
     # ----------------------------------------------------
     # step three is determining how many filters you want
     # and then add 2 more filters to it
-    mel_scale_filterbank_channels = 7
-    # now calculate 
+    #mel_scale_filterbank_channels = 7
+    #print(mel_maximum)
+    # now calculate equal parts from each of these frequencies
+    # say i want 7 filters
+    
+    # calculating the step between each filters
+    step_size = (mel_maximum - mel_minimum) / (filter_channels - 1)
+    
+    melFrequencies = np.zeros(filter_channels)
+    for n in range(filter_channels):
+        melFrequencies[n] = n * step_size
+        
+        
+        
+        
+    # now that we have the mel frequencies we need to now turn them
+    # back into normal frequencies which can be done using a special 
+    # equation
+    
+    
+    mel_to_freq = np.zeros(filter_channels)
+    for n in range(filter_channels):
+        mel_to_freq[n] = 700 * (np.exp(melFrequencies[n] / 1125) - 1)
+        
+    
+    #print(mel_to_freq)
+    # now we need to calculate the bins that the frequencies relate to
+    freq_to_bins = np.zeros(filter_channels)
+    for n in range(filter_channels):
+        bin_number = (160/8000) * mel_to_freq[n]
+        freq_to_bins[n] = int(round(bin_number))
+       
+        
+    xpoints = mel_to_freq
+    ypoints = melFrequencies
+    #plt.plot(xpoints, ypoints)
+    #plt.title("Melfrequency to frequency bins")
+    #plt.ylabel("Mel Frequencies")
+    #plt.xlabel("Frequency")
+    #plt.show()
+    #print(freq_to_bins)
+    # now that we have the corresponding frequency bins we can do 
+    # some magic with the basis vectors
+    
+    
+    # ----------------------------------------------------
+    # now is the time for calculating the monstrosities that are the 
+    # basis vector equations that are needed to finish implementing this
+    # type of filterbank
+    mfcc_matrix = np.zeros((filter_channels - 2, useful_magspec.size))
+    for m in range(1, filter_channels - 1):
+        for k in range(useful_magspec.size):
+            if k < freq_to_bins[m-1]:
+                mfcc_matrix[m-1, k] = 0
+            elif freq_to_bins[m - 1] <= k <= freq_to_bins[m]:
+                # the part of the triangle before the peak
+                mfcc_matrix[m-1, k] = (k - freq_to_bins[m - 1])/(freq_to_bins[m] - freq_to_bins[m-1])
+            elif  freq_to_bins[m] <= k <= freq_to_bins[m+1]:
+                # the part of the triangle after the peak
+                mfcc_matrix[m-1, k] = (freq_to_bins[m+1] - k)/(freq_to_bins[m+1] - freq_to_bins[m])
+            elif k > freq_to_bins[m+1]:
+                mfcc_matrix[m-1, k] = 0
+            
     
     
     
-def log_dct(fbank):
-    print("Completing the log and dct after the filterbank")
+    # ----------------------------------------------------
+    # need to transpose the values for the matrix
+    transposed_mfcc_matrix = mfcc_matrix.transpose()
+    
+    #plt.plot(transposed_mfcc_matrix)
+    #plt.show()
+    #print(mfcc_matrix.shape)
+    #print(mfcc_matrix)
+    
+    
+    
+    
+    feature_vector = np.matmul(transposed_mfcc_matrix.T, useful_magspec)
+    
+    #plt.plot(feature_vector)
+    #plt.show()
+    
+    # ----------------------------------------------------
+    # now it is time to log the values of the feature vector
+    
+    logged_feature_vector = np.log(feature_vector)
+    
+    # ----------------------------------------------------
+    # now we have to apply the dct function to the 
+    # logged feature vectors
+    return  spy.fft.dct(logged_feature_vector)
+    
+    # ----------------------------------------------------
+    
+    
+        
+
+    
+    
+    
+    
+
 
 
 def getting_wav_files():
     print("Getting wavfiles")
+    # ----------------------------------------------------
+    # these are variables that are necessary to get the wav files from each
     sample_rate = 16000
     # gets the full audio file
     recorded_data_directory = Path.cwd().absolute()
     wav_files = recorded_data_directory / "recorded_wav_files"
     mono_files = wav_files / "mono_files"
+    # ----------------------------------------------------
+    # every file needs to be the same length so that they can 
+    # go into the neural network without any issue 
+    # the longest duration is below, which means the maximum
+    # total of samples in any file is 3.3*16000 so numpy array 
+    # extracted from each file needs to be made to be the same 
+    # length
+    # longest_duration for a file was 3.3 seconds
+    maximum_total_samples = int(3.3*16000)
+    # should equal 52800 which is a yikes but luckily all of it 
+    # gets halved
+    # ----------------------------------------------------
+    # now we iterate through every file in the mono directory and 
+    # apply the feature extraction on every frame in the file
+    # and then store the feature vectors in labelled matrixes 
+    # ready to be fed into the Deep neural network
+    # ----------------------------------------------------
+    # for every file in the mono folder get it
+    
+    #for wav_path in sorted(mono_files.glob("*.wav")):
+    #    # read the current file
+    #    wav_file, sample_rate = sf.read(wav_path,dtype='float32')
+    #    
+        # need to pad each mono file to the same length
+        # as they are all arrays you can treat them like arrays of numbers
+    #    if len(wav_file) < maximum_total_samples:
+    #        wav_file = np.pad(wav_file, (0, maximum_total_samples - len(wav_file)))
+    #    else:
+    #        wav_file = wav_file[:maximum_total_samples]
+        # ----------------------------------------------------
+        # starting the feature extraction, 
+        # this should return 
+        #feature_extraction(wav_file,duration,sample_rate)
+        
+            
+            #features_list.append(features)
+            #file_names.append(wav_path.name)
+            #labels.append(wav_path.stem.split("_")[0])  # e.g. "Aaron_R1" -> "Aaron"
+        
+            #X = np.array(features_list)
+            #y = np.array(labels)
+        # ----------------------------------------------------
+        
     Aaron_recorded = mono_files / "Aaron_R1.wav"
-    
-    
-    
     wav_file, sample_rate = sf.read(Aaron_recorded,dtype='float32')
-    
     duration = len(wav_file) / sample_rate
+    frame_length = 320
+    hop_length = frame_length // 2
+        
+    # frame vectors will store 329 lots of 20 feature vectors
+        
+    frame_vectors=[]
+    if len(wav_file) < maximum_total_samples:
+            wav_file = np.pad(wav_file, (0, maximum_total_samples - len(wav_file)))
+    else:
+            wav_file = wav_file[:maximum_total_samples]
+        
+    for start in range(0, len(wav_file) - frame_length + 1, hop_length):
+        frame = wav_file[start: start + frame_length]
+        
+            
+            
+        feature_vector = feature_extraction(frame,duration,sample_rate)
+        frame_vectors.append(feature_vector)
+        
+    mfcc_for_aaron = np.array(frame_vectors)
+    
+    
+    features_path = recorded_data_directory / "features"
     
     
     
-    # then need to start feature extraction
+    #print(mfcc_for_aaron.shape)
     
-    feature_extraction(wav_file,duration,sample_rate)
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
 
 
 
-def feature_extraction(wav_file,duration, sample_rate):
-    print("Beginning feature extraction")
+def feature_extraction(frame,duration, sample_rate):
+    #print("Beginning feature extraction")
     
     # ----------------------------------------------------
-    #to do list
-    # - add 50% overlap on frames before hamming the window
-    #
+    # a single frame is being sent to this file
     # ----------------------------------------------------
     # calculating total samples in the file
-    total_samples = int(sample_rate * duration)
-    print(f"Total number of samples in the wav file: {total_samples}")
+    #total_samples = int(sample_rate * duration)
+    #print(f"Total number of samples in the wav file: {total_samples}")
     # ----------------------------------------------------
     #calculating samples per window
     samples_per_window = int(0.02*sample_rate)
-    print(f"Total number of samples per window: {samples_per_window}")
+    #print(f"Total number of samples per window: {samples_per_window}")
     # ----------------------------------------------------
     #calculating total number of windows
-    total_windows = int(total_samples/samples_per_window)
-    print(f"Total number of windows: {total_windows}")
+    #total_windows = int(total_samples/samples_per_window)
+    #print(f"Total number of windows: {total_windows}")
     # ----------------------------------------------------
-    # now we need to split this wav file into frames
-    numbers_to_slice = []
-    for i in range(total_windows):
-        numbers_to_slice.append(samples_per_window*(i+1))
-    # ----------------------------------------------------
-    # this isnt doing too much it is literally just spewing 
-    # out the contents of the array, so that i can see them
-    #for n in numbers_to_slice:
-    #    print(n)
-    # ----------------------------------------------------
-    #testing the slicing stuff on one frame
-    #with no 50% overlap yet
-    
+      
     #pio.renderers.default='browser'
     
     #fig = px.line(wav_file)
@@ -229,11 +398,18 @@ def feature_extraction(wav_file,duration, sample_rate):
     #plt.plot(wav_file[numbers_to_slice[0]:numbers_to_slice[1]])
     #plt.plot(wav_file[numbers_to_slice[5]:numbers_to_slice[6]])
     # ----------------------------------------------------
-    # now slice the audio file according to the values in the array
-    #for i in range(total_windows):
-        # get the window and then apply the feature extraction
+    # now need to go through each frame of the file and 
     
-    magSpec, phaseSpec= magPhase(wav_file[numbers_to_slice[0]:numbers_to_slice[1]], samples_per_window)
+    
+    magSpec, phaseSpec= magPhase(frame, samples_per_window)
+    
+    
+    
+    
+    
+    
+    
+    
     
     # ----------------------------------------------------
     # now time for the filterbank section of feature extraction
@@ -261,8 +437,14 @@ def feature_extraction(wav_file,duration, sample_rate):
     #plt.plot(linear_filterbank(magSpec))
     #print(linear_filterbank(magSpec))
     #plt.show()
-    mel_scaled_filterbank(magSpec)
     
+    # ----------------------------------------------------
+    # we now have a feature vector for a single frame
+    # this is really where we need to generate all of them for a file
+    # i need all of these for a given file
+    feature_vector = mel_scaled_filterbank(magSpec)
+    #print(feature_vector)
+    return feature_vector
 
 
 

@@ -249,14 +249,14 @@ def mel_scaled_filterbank(magSpec):
     
     # ----------------------------------------------------
     # now it is time to log the values of the feature vector
-    
-    logged_feature_vector = np.log(feature_vector)
+    epsilon = 1e-10
+    logged_feature_vector = np.log(feature_vector + epsilon)
     
     # ----------------------------------------------------
     # now we have to apply the dct function to the 
     # logged feature vectors
+    #return  spy.fft.dct(logged_feature_vector)
     return  spy.fft.dct(logged_feature_vector)
-    
     # ----------------------------------------------------
     
     
@@ -344,13 +344,16 @@ def getting_wav_files():
         frame_vectors.append(feature_vector)
         
     mfcc_for_aaron = np.array(frame_vectors)
+    plt.imshow(mfcc_for_aaron)
+    for n in mfcc_for_aaron:
+        print(n)
     
     
     features_path = recorded_data_directory / "features"
     
     
     
-    #print(mfcc_for_aaron.shape)
+    print(mfcc_for_aaron.shape)
     
     
     
